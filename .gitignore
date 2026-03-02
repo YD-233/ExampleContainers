@@ -3,3 +3,4 @@ __pycache__/
 main
 .idea
 mythic_go_services.bin
+Payload_Type/my_agent_service/mythic_go_services
