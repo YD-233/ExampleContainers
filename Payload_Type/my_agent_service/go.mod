@@ -9,8 +9,13 @@ toolchain go1.23.3
 require github.com/MythicMeta/MythicContainer v1.4.23
 
 require (
+	github.com/creack/pty v1.1.24
+	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
+)
+
+require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect

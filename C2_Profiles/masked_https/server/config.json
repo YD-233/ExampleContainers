@@ -1,0 +1,21 @@
+{
+  "bind_port": 8443,
+  "use_ssl": true,
+  "cert_file": "",
+  "key_file": "",
+  "decoy_status_code": 200,
+  "decoy_content_type": "text/html; charset=utf-8",
+  "decoy_body": "\u003chtml\u003e\u003chead\u003e\u003ctitle\u003emasked_https\u003c/title\u003e\u003c/head\u003e\u003cbody\u003e\u003ch1\u003eIt works\u003c/h1\u003e\u003c/body\u003e\u003c/html\u003e",
+  "callback_host": "https://127.0.0.1",
+  "callback_port": "8443",
+  "post_path": "/cdn-cgi/submit",
+  "websocket_path": "/cdn-cgi/ws",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "host_header": "",
+  "extra_headers": {
+    "Accept": "*/*",
+    "Accept-Language": "zh-CN,zh;q=0.9"
+  },
+  "query_string": "",
+  "aes_psk": "JhQIiZEcIfuaGqKEVaoWpgYVJIYhDEw3z65Wh1INL+Y="
+}

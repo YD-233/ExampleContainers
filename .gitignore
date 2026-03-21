@@ -3,5 +3,6 @@ __pycache__/
 main
 .idea
 mythic_go_services.bin
-Payload_Type/my_agent_service/mythic_go_services
-Mythic_Doc(不计入开发)/
+Payload_Type/my_agent_service/
+Mythic_Doc/
+.playwright-cli/*
