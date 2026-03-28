@@ -4,7 +4,7 @@ go 1.23.0
 
 toolchain go1.23.3
 
-//replace github.com/MythicMeta/MythicContainer => ../../../../MythicMeta/MythicContainer
+replace github.com/MythicMeta/MythicContainer => ./_deps_mythic_container
 
 require github.com/MythicMeta/MythicContainer v1.4.23
 

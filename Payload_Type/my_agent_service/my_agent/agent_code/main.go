@@ -61,14 +61,16 @@ func main() {
 		log.Printf("session 配置: enabled=%t websocket=未配置\n", config.EnableSessionMode)
 	}
 	log.Printf("轮询间隔: %ds\n", config.PollIntervalSeconds)
-	log.Printf("能力开关: interactive=%t socks=%t rpfwd=%t shell=%s tls_skip_verify=%t\n",
+	// 这些能力标志正式构建时由 UI 中勾选的命令列表推导；
+	// 本地 run_agent_local 时仍允许通过环境变量覆盖，便于单独调试。
+	log.Printf("命令能力: interactive=%t socks=%t rpfwd=%t shell=%s tls_skip_verify=%t\n",
 		runtimeConfig.InteractiveEnabled,
 		runtimeConfig.SocksEnabled,
 		runtimeConfig.RpfwdEnabled,
 		runtimeConfig.InteractiveShell,
 		config.InsecureSkipVerify,
 	)
-	log.Printf("信息收集模块: sysinfo=%t ps=%t avscan=%t\n",
+	log.Printf("已包含的信息收集命令: sysinfo=%t ps=%t avscan=%t\n",
 		runtimeConfig.SysinfoEnabled,
 		runtimeConfig.ProcessListEnabled,
 		runtimeConfig.AVScanEnabled,
@@ -78,6 +80,8 @@ func main() {
 }
 
 func applyRuntimeOverrides() {
+	// 这些环境变量仅用于本地源码调试兜底，不影响正式 build 时
+	// “Select Commands to Include in the Payload” 的命令勾选逻辑。
 	if BuildPayloadUUID == "" {
 		BuildPayloadUUID = strings.TrimSpace(os.Getenv("MY_AGENT_PAYLOAD_UUID"))
 	}

