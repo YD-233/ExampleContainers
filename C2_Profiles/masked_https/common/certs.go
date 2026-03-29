@@ -28,6 +28,12 @@ func EnsureTLSFiles(baseDir string, config RuntimeConfig) (RuntimeConfig, error)
 			return config, nil
 		}
 	}
+	if err := os.MkdirAll(filepath.Dir(certPath), 0700); err != nil {
+		return config, err
+	}
+	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
+		return config, err
+	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -69,7 +75,7 @@ func EnsureTLSFiles(baseDir string, config RuntimeConfig) (RuntimeConfig, error)
 		return config, err
 	}
 
-	certOut, err := os.Create(certPath)
+	certOut, err := os.OpenFile(certPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return config, err
 	}
@@ -78,7 +84,7 @@ func EnsureTLSFiles(baseDir string, config RuntimeConfig) (RuntimeConfig, error)
 		return config, err
 	}
 
-	keyOut, err := os.Create(keyPath)
+	keyOut, err := os.OpenFile(keyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return config, err
 	}
@@ -95,7 +101,7 @@ func EnsureTLSFiles(baseDir string, config RuntimeConfig) (RuntimeConfig, error)
 func resolveConfigFile(baseDir string, configured string, fallback string) string {
 	trimmed := strings.TrimSpace(configured)
 	if trimmed == "" {
-		return filepath.Join(baseDir, fallback)
+		return filepath.Join(GeneratedDirPath(baseDir), fallback)
 	}
 	if filepath.IsAbs(trimmed) {
 		return trimmed

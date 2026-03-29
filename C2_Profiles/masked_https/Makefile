@@ -1,9 +1,12 @@
+-include .env
+-include .env.local
+
 BINARY_NAME?=mythic_go_services
 SERVER_BINARY?=server/masked_https_server
 DEBUG_LEVEL?="trace"
 RABBITMQ_HOST?="127.0.0.1"
 RABBITMQ_PORT?="5672"
-RABBITMQ_PASSWORD?="onlc1X9zmaYD0q2Zr5n1iJcmso0omH"
+RABBITMQ_PASSWORD?=
 MYTHIC_SERVER_HOST?="127.0.0.1"
 MYTHIC_SERVER_PORT?="17443"
 MYTHIC_SERVER_GRPC_PORT?="17444"
@@ -23,6 +26,7 @@ local:
 	go build -o ${SERVER_BINARY} ./server
 
 run_local_service:
+	@test -n "${RABBITMQ_PASSWORD}" || (echo "请先通过环境变量、.env 或 .env.local 提供 RABBITMQ_PASSWORD"; exit 1)
 	DEBUG_LEVEL=${DEBUG_LEVEL} \
 RABBITMQ_HOST=${RABBITMQ_HOST} \
 RABBITMQ_PORT=${RABBITMQ_PORT} \

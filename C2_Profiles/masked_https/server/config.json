@@ -10,11 +10,12 @@
   "callback_port": "8443",
   "post_path": "/cdn-cgi/submit",
   "websocket_path": "/cdn-cgi/ws",
-  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-  "host_header": "cdn.example.com",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+  "host_header": "",
   "extra_headers": {
     "Accept": "*/*",
     "Accept-Language": "zh-CN,zh;q=0.9"
   },
-  "query_string": "v=1"
+  "query_string": "",
+  "aes_psk": "JxiTiiZiaXIuQVUhM3HI9CSYccVnXDR870Y6hvqYC2g="
 }

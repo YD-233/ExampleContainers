@@ -24,7 +24,7 @@ var payloadDefinition = agentstructs.PayloadType{
 	CanBeWrappedByTheFollowingPayloadTypes: []string{},
 	SupportsDynamicLoading:                 true,
 	Description:                            "最小可跑的 Go Agent 模板（用于 Mythic 二次开发）",
-	SupportedC2Profiles:                    []string{"http", "websocket", "masked_https"},
+	SupportedC2Profiles:                    []string{"masked_https"},
 	MythicEncryptsData:                     true,
 	MessageFormat:                          agentstructs.MessageFormatJSON,
 	BuildParameters: []agentstructs.BuildParameter{
@@ -79,7 +79,7 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 
 	if len(payloadBuildMsg.C2Profiles) == 0 {
 		response.Success = false
-		response.BuildStdErr = "必须至少选择一个 C2 Profile"
+		response.BuildStdErr = "必须选择 masked_https C2 Profile"
 		return response
 	}
 
@@ -113,51 +113,22 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 	enableSessionMode := capabilities.sessionModeEnabled
 	response.UpdatedCommandList = &commandList
 
-	httpEmbedded := embeddedBuildProfile{}
-	websocketEmbedded := embeddedBuildProfile{}
-	if maskedProfile, exists := findC2Profile(payloadBuildMsg.C2Profiles, "masked_https"); exists {
-		httpEmbedded, websocketEmbedded, err = buildMaskedHTTPSProfiles(maskedProfile)
-		if err != nil {
-			response.Success = false
-			response.BuildStdErr = err.Error()
-			return response
-		}
-		if enableSessionMode && strings.TrimSpace(websocketEmbedded.Parameters["websocket_path"].(string)) == "" {
-			response.Success = false
-			response.BuildStdErr = "启用 session mode 时 websocket_path 不能为空"
-			return response
-		}
-	} else {
-		httpProfile, ok := findC2Profile(payloadBuildMsg.C2Profiles, "http")
-		if !ok {
-			response.Success = false
-			response.BuildStdErr = "必须选择 http C2 Profile 或 masked_https C2 Profile"
-			return response
-		}
-		httpEmbedded, err = buildEmbeddedProfile("http", httpProfile)
-		if err != nil {
-			response.Success = false
-			response.BuildStdErr = err.Error()
-			return response
-		}
-		if httpEmbedded.CallbackHost == "" {
-			response.Success = false
-			response.BuildStdErr = "callback_host 不能为空"
-			return response
-		}
-		if websocketProfile, exists := findC2Profile(payloadBuildMsg.C2Profiles, "websocket"); exists {
-			websocketEmbedded, err = buildEmbeddedProfile("websocket", websocketProfile)
-			if err != nil {
-				response.Success = false
-				response.BuildStdErr = err.Error()
-				return response
-			}
-		}
-		if enableSessionMode && strings.TrimSpace(websocketEmbedded.CallbackHost) == "" {
-			response.Success = false
-			response.BuildStdErr = "启用 session mode 时必须同时选择 websocket C2 Profile"
-			return response
-		}
+	maskedProfile, exists := findC2Profile(payloadBuildMsg.C2Profiles, "masked_https")
+	if !exists {
+		response.Success = false
+		response.BuildStdErr = "必须选择 masked_https C2 Profile"
+		return response
+	}
+	httpEmbedded, websocketEmbedded, err := buildMaskedHTTPSProfiles(maskedProfile)
+	if err != nil {
+		response.Success = false
+		response.BuildStdErr = err.Error()
+		return response
+	}
+	if enableSessionMode && strings.TrimSpace(websocketEmbedded.Parameters["websocket_path"].(string)) == "" {
+		response.Success = false
+		response.BuildStdErr = "启用 session mode 时 websocket_path 不能为空"
+		return response
 	}
 
 	embeddedConfigB64, err := buildEmbeddedConfigB64(embeddedBuildConfig{
@@ -194,12 +165,6 @@ func build(payloadBuildMsg agentstructs.PayloadBuildMessage) agentstructs.Payloa
 		"main.BuildCallbackPort":          httpEmbedded.CallbackPort,
 		"main.BuildAESPSK":                httpEmbedded.AESPSK,
 		"main.BuildEnableSessionMode":     fmt.Sprintf("%t", enableSessionMode),
-		"main.BuildEnableInteractive":     fmt.Sprintf("%t", capabilities.interactiveEnabled),
-		"main.BuildEnableSocks":           fmt.Sprintf("%t", capabilities.socksEnabled),
-		"main.BuildEnableRpfwd":           fmt.Sprintf("%t", capabilities.rpfwdEnabled),
-		"main.BuildEnableSysinfo":         fmt.Sprintf("%t", capabilities.sysinfoEnabled),
-		"main.BuildEnableProcessList":     fmt.Sprintf("%t", capabilities.processListEnabled),
-		"main.BuildEnableAVScan":          fmt.Sprintf("%t", capabilities.avscanEnabled),
 		"main.BuildInteractiveShell":      interactiveShell,
 		"main.BuildInsecureSkipVerify":    fmt.Sprintf("%t", insecureSkipVerify),
 		"main.BuildWebsocketCallbackHost": websocketEmbedded.CallbackHost,
@@ -360,12 +325,6 @@ func buildLdflags(values map[string]string) string {
 		"main.BuildCallbackPort",
 		"main.BuildAESPSK",
 		"main.BuildEnableSessionMode",
-		"main.BuildEnableInteractive",
-		"main.BuildEnableSocks",
-		"main.BuildEnableRpfwd",
-		"main.BuildEnableSysinfo",
-		"main.BuildEnableProcessList",
-		"main.BuildEnableAVScan",
 		"main.BuildInteractiveShell",
 		"main.BuildInsecureSkipVerify",
 		"main.BuildWebsocketCallbackHost",

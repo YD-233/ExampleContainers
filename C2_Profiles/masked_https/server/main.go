@@ -38,6 +38,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("准备 TLS 证书失败: %v", err)
 	}
+	if err := os.MkdirAll(common.GeneratedDirPath(baseDir), 0700); err != nil {
+		log.Fatalf("准备运行目录失败: %v", err)
+	}
+	pidFile := common.PIDFilePath(baseDir)
+	if err := os.WriteFile(pidFile, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0600); err != nil {
+		log.Fatalf("写入 pid 文件失败: %v", err)
+	}
+	defer os.Remove(pidFile)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(config.PostPath, func(w http.ResponseWriter, r *http.Request) {
@@ -95,25 +103,7 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request, config common.Runti
 	if err != nil {
 		return
 	}
-	defer conn.Close()
-
-	for {
-		var envelope websocketEnvelope
-		if err := conn.ReadJSON(&envelope); err != nil {
-			return
-		}
-		if strings.TrimSpace(envelope.Data) == "" {
-			_ = conn.WriteJSON(websocketEnvelope{Client: false, Data: ""})
-			continue
-		}
-		responseBody, _, _, err := forwardToMythic([]byte(envelope.Data))
-		if err != nil {
-			return
-		}
-		if err := conn.WriteJSON(websocketEnvelope{Client: false, Data: string(responseBody), Tag: envelope.Tag}); err != nil {
-			return
-		}
-	}
+	handlePushWebsocket(conn)
 }
 
 func writeDecoyResponse(w http.ResponseWriter, config common.RuntimeConfig) {
@@ -134,12 +124,13 @@ func forwardToMythic(body []byte) ([]byte, int, string, error) {
 	req.Header.Set("Content-Type", "text/plain")
 	req.Header.Set("Mythic", "masked_https")
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+	transport := &http.Transport{}
+	if strings.HasPrefix(strings.ToLower(targetURL), "https://") {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: parseBoolEnv("MYTHIC_SERVER_INSECURE_SKIP_VERIFY", false),
+		}
 	}
+	client := &http.Client{Timeout: 30 * time.Second, Transport: transport}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, "", err
@@ -188,6 +179,18 @@ func appendAgentMessagePath(base string) (string, error) {
 		parsed.Path = strings.TrimRight(parsed.Path, "/") + "/agent_message"
 	}
 	return parsed.String(), nil
+}
+
+func parseBoolEnv(name string, defaultValue bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	switch value {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return defaultValue
+	}
 }
 
 func init() {

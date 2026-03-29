@@ -13,7 +13,7 @@ import (
 
 var c2Definition = c2structs.C2Profile{
 	Name:             "masked_https",
-	Description:      "基于 HTTPS/WSS 的基础流量伪装 C2 Profile",
+	Description:      "基于 HTTPS/WSS 的 Beacon + Push Session C2 Profile",
 	Author:           "@zhujiayi",
 	IsP2p:            false,
 	IsServerRouted:   false,

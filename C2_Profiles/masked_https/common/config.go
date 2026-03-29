@@ -123,6 +123,14 @@ func ConfigPath(baseDir string) string {
 	return filepath.Join(baseDir, "config.json")
 }
 
+func GeneratedDirPath(baseDir string) string {
+	return filepath.Join(baseDir, ".generated")
+}
+
+func PIDFilePath(baseDir string) string {
+	return filepath.Join(GeneratedDirPath(baseDir), "masked_https_server.pid")
+}
+
 func normalizeConfig(config RuntimeConfig) RuntimeConfig {
 	if config.BindPort <= 0 {
 		config.BindPort = 8443

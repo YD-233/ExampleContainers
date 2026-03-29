@@ -80,8 +80,11 @@ func main() {
 }
 
 func applyRuntimeOverrides() {
-	// 这些环境变量仅用于本地源码调试兜底，不影响正式 build 时
-	// “Select Commands to Include in the Payload” 的命令勾选逻辑。
+	// 这些环境变量仅用于本地源码调试兜底。
+	// 正式构建时统一以嵌入配置为准，命令能力来自 payload 的命令勾选。
+	if BuildEmbeddedConfigB64 == "" {
+		BuildEmbeddedConfigB64 = strings.TrimSpace(os.Getenv("MY_AGENT_EMBEDDED_CONFIG_B64"))
+	}
 	if BuildPayloadUUID == "" {
 		BuildPayloadUUID = strings.TrimSpace(os.Getenv("MY_AGENT_PAYLOAD_UUID"))
 	}
@@ -96,24 +99,6 @@ func applyRuntimeOverrides() {
 	}
 	if BuildInsecureSkipVerify == "" {
 		BuildInsecureSkipVerify = strings.TrimSpace(os.Getenv("MY_AGENT_INSECURE_SKIP_VERIFY"))
-	}
-	if BuildEnableInteractive == "" {
-		BuildEnableInteractive = strings.TrimSpace(os.Getenv("MY_AGENT_ENABLE_INTERACTIVE"))
-	}
-	if BuildEnableSocks == "" {
-		BuildEnableSocks = strings.TrimSpace(os.Getenv("MY_AGENT_ENABLE_SOCKS"))
-	}
-	if BuildEnableRpfwd == "" {
-		BuildEnableRpfwd = strings.TrimSpace(os.Getenv("MY_AGENT_ENABLE_RPFWD"))
-	}
-	if BuildEnableSysinfo == "" {
-		BuildEnableSysinfo = strings.TrimSpace(os.Getenv("MY_AGENT_ENABLE_SYSINFO"))
-	}
-	if BuildEnableProcessList == "" {
-		BuildEnableProcessList = strings.TrimSpace(os.Getenv("MY_AGENT_ENABLE_PROCESS_LIST"))
-	}
-	if BuildEnableAVScan == "" {
-		BuildEnableAVScan = strings.TrimSpace(os.Getenv("MY_AGENT_ENABLE_AVSCAN"))
 	}
 	if BuildInteractiveShell == "" {
 		BuildInteractiveShell = strings.TrimSpace(os.Getenv("MY_AGENT_INTERACTIVE_SHELL"))
