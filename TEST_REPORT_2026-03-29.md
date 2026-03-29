@@ -358,53 +358,68 @@ macOS 实测：
 
 ### 8.6 `rpfwd` 回归结果
 
-本轮另外补测了基于真 Push Session 的 `rpfwd`。
+本轮另外补测了基于真 Push Session 的 `rpfwd`，最终已验证通过。
 
 测试载荷：
 
 - payload UUID：`149b81f8-c14e-4790-a6b2-2df062eeb3e8`
-- beacon callback：`C-95`
-- session callback：`C-96`
+- 第一轮：
+  - beacon callback：`C-95`
+  - session callback：`C-96`
+- 第二轮复测：
+  - beacon callback：`C-97`
+  - session callback：`C-98`
 
-测试方式：
+关键结论：
+
+- `rpfwd` 代码路径本身没有结构性错误
+- 第一轮失败的根因是测试参数使用了：
+  - `remote_ip=127.0.0.1`
+- 对 `rpfwd` 来说，这个地址是 **Mythic 容器视角** 的 `127.0.0.1`，不是宿主机的回环地址
+- 因此返回 `503` 是预期结果，不是 Agent 逻辑错误
+
+修正后的测试方式：
 
 1. 操作端本机启动临时 HTTP 服务：
-   - `python3 -m http.server 18082 --bind 127.0.0.1`
-2. 在 session callback `C-96` 上下发：
-   - `rpfwd {"local_port":18083,"remote_ip":"127.0.0.1","remote_port":18082}`
-3. 操作端本机直接访问：
+   - `python3 -m http.server 18082 --bind 0.0.0.0`
+2. 从 Mythic 容器验证宿主机可达地址：
+   - `10.128.53.182:18082`
+3. 在 session callback `C-98` 上下发：
+   - `rpfwd {"local_port":18083,"remote_ip":"10.128.53.182","remote_port":18082}`
+4. 操作端本机直接访问：
    - `curl -I http://127.0.0.1:18083 --max-time 15`
 
 任务结果：
 
 | 功能 | 任务 | 结果 |
 |---|---|---|
-| `session_status` | `T-255` | 成功 |
-| `rpfwd` | `T-256` | 成功 |
-| `rpfwd_stop` | `T-257` | 成功 |
-| `session_stop` | `T-258` | 成功 |
-| `exit` | `T-259` | 成功 |
+| 第一轮 `session_status` | `T-255` | 成功 |
+| 第一轮 `rpfwd` | `T-256` | 成功 |
+| 第二轮 `session_status` | `T-261` | 成功 |
+| 第二轮 `rpfwd` | `T-262` | 成功 |
+| 第二轮 `rpfwd_stop` | `T-263` | 成功 |
+| 第二轮 `session_stop` | `T-264` | 成功 |
+| 第二轮 `exit` | `T-265` | 成功 |
 
 实流量结果：
 
 - `curl -I http://127.0.0.1:18083 --max-time 15`
-  - 返回：`HTTP/1.1 503 Service Unavailable`
+  - 成功，返回：`HTTP/1.0 200 OK`
+  - `Server: SimpleHTTP/0.6 Python/3.13.3`
 
-Agent 侧日志：
+临时 HTTP 服务日志：
 
-- 收到 `rpfwd` Push 消息后，出现：
-  - `rpfwd 数据处理失败: 未找到 rpfwd 连接: server_id=3522588691 port=18083`
+- `10.128.53.182 - - [29/Mar/2026 13:49:26] "GET / HTTP/1.1" 200 -`
+- `127.0.0.1 - - [29/Mar/2026 13:50:34] "HEAD / HTTP/1.1" 200 -`
 
 结论：
 
-- `rpfwd` 当前已完成：
+- `rpfwd` 已完成：
   - 命令注册
   - 任务创建
-  - session 下推
+  - 真 Push Session 下推
   - 启停命令回归
-- 但真实转发链路尚未通过
-- 当前断点更像是：
-  - Mythic 返回给 Agent 的 `server_id/port` 与 Agent 本地 `acceptLoop` 建立的连接映射没有对上
+  - 真实端口转发验证
 
 工程判断：
 
@@ -412,6 +427,6 @@ Agent 侧日志：
 - `真 Push Session`
 - `pty`
 - `socks`
+- `rpfwd`
 
-这四条主链已经打通；
-`rpfwd` 是当前剩余的主要未闭环项。
+这五条主链现已全部打通。
