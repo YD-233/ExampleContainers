@@ -1,0 +1,41 @@
+{
+  "source_file": "/Users/zhujiayi/Downloads/计算机学院毕业设计（论文）表格及格式规范2026版/计算机学院毕业设计（论文）表格/正文示例.docx",
+  "styles": {
+    "body_cn": {
+      "font": "宋体",
+      "size_pt": 12.0,
+      "bold": false,
+      "alignment": "left",
+      "first_line_indent_pt": 24.0,
+      "line_spacing": 279400.0,
+      "space_before_pt": 0.0,
+      "space_after_pt": 0.0,
+      "page_break_before": false,
+      "sample_count": 18
+    },
+    "heading2": {
+      "font": null,
+      "size_pt": 12.0,
+      "bold": true,
+      "alignment": "left",
+      "first_line_indent_pt": 24.1,
+      "line_spacing": 279400.0,
+      "space_before_pt": 0.0,
+      "space_after_pt": 0.0,
+      "page_break_before": false,
+      "sample_count": 1
+    },
+    "heading3": {
+      "font": null,
+      "size_pt": 12.0,
+      "bold": false,
+      "alignment": "left",
+      "first_line_indent_pt": 24.0,
+      "line_spacing": 279400.0,
+      "space_before_pt": 0.0,
+      "space_after_pt": 0.0,
+      "page_break_before": false,
+      "sample_count": 1
+    }
+  }
+}
